@@ -43,6 +43,7 @@ _CHARACTER_CLASSES = {
     u'upper': re.compile(u'[A-Z]'),
     u'xdigit': re.compile(u'[A-Fa-f0-9]'),
 }
+_PY_IMPOSSIBLE_MATCH = u'(?:a\A)'
 
 # Wildmatch special characters
 _SLASH = u'/'  # Directories separator
@@ -81,7 +82,10 @@ class _BracketExpression(object):
         self.items = items
 
 
-# Create a bracket expression item
+# Create a node
+
+def _create_bracket_expression(matching, items):
+    return u'bracket_expression', matching, items
 
 def _create_be_collating_element(sequence):
     return u'collating_element', sequence
@@ -103,7 +107,10 @@ def _create_be_unmatched_range():
     return (u'_unmatched_range',)
 
 
-# Test a bracket expression item
+# Test a node
+
+def _is_bracket_expression(node):
+    return node[0] ==  u'bracket_expression'
 
 def _is_be_collating_element(item):
     return item[0] == u'collating_element'
@@ -125,7 +132,9 @@ def _is_be_unmatched_range(item):
     return item[0] == u'_unmatched_range'
 
 
-# Read a bracket expression item
+# Read a node
+def _read_bracket_expression(node):
+    return node[1], node[2]
 
 def _read_be_collating_element(item):
     return item[1]
@@ -178,6 +187,8 @@ def _parse_bracket_expression(pattern, start=0):
     while len(items) == 0 or pattern[i:i + len(_BE_CLOSE)] != _BE_CLOSE:
         if pattern[i:i+len(_ESCAPE)] == _ESCAPE:  # Literal escape \a
             i += len(_ESCAPE)
+            if i >= len(pattern):
+                raise ValueError(u'Invalid pattern, incomplete escape sequence')
             items.append(_create_be_collating_element(pattern[i:i + 1]))
             i += 1
         elif pattern[i:i+len(_BE_CS_OPEN)] == _BE_CS_OPEN:  # Collating symbol [.abc.]
@@ -204,6 +215,7 @@ def _parse_bracket_expression(pattern, start=0):
 
         if i >= len(pattern):
             raise ValueError(u'InvalidPattern, end of bracket expression not found')
+    i += len(_BE_CLOSE)
 
     # Second pass: resolve ranges
     items_with_ranges = []
@@ -245,7 +257,7 @@ def _parse_bracket_expression(pattern, start=0):
                 _create_be_collating_element(_BE_RANGE)
         j += 1
 
-    return matching, items_with_ranges
+    return _create_bracket_expression(matching, items_with_ranges), i - start
 
 
 
@@ -329,16 +341,208 @@ def _parse_be_character_class_expression(pattern, start=0):
     return pattern[ce_start:ce_end], i - start
 
 
-def translate(pattern, casefold=False, pathname=True):
+def translate(pattern, no_escape=False, path_name=False, wild_star=False, period=False,
+              case_fold=False):
     u"""
     Converts a wildmatch pattern to a regex
 
+    Note that the EXTMATCH (ksh extended glob patterns) option is not available
+
     :type pattern: text_type
     :param pattern: A wildmatch pattern
+    :type text: text_type
+    :param text: The text to match
+    :type no_escape: bool
+    :param no_escape: Disable backslash escaping
+    :type path_name: bool
+    :param path_name: Separator (slash) in text cannot be matched by an asterisk, question-mark nor
+                      bracket expression in pattern (only a literal).
+    :type wild_star: bool
+    :param wild_star: A True value forces the `path_name` flag to True. This allows the
+                      double-asterisk `**` to match any (0 to many) number of directories
+    :type period: bool
+    :param period: A leading period in text cannot be matched by an asterisk, question-mark nor
+                   bracket expression in pattern (only a literal). A period is "leading" if:
+                   - it is the first character of `text`
+                   OR
+                   - path_name (or wild_star) is True and the previous character is a slash
+    :type case_fold: bool
+    :param case_fold: Perform a case insensitive match (GNU Extension)
     :rtype: RegexType
     :return: A compiled regex object
     """
-    raise NotImplementedError(u'translate')
+
+    # wild_star implies path_name
+    if wild_star:
+        path_name = True
+
+    result = []
+
+    i = 0
+
+    head_wild_star = False  # Wildstar at the start of the string
+    tail_wild_star = False  # Wildstar at the end of the string
+
+    while i < len(pattern):
+        # Literal escape \
+        if not no_escape and pattern[i:i+len(_ESCAPE)] == _ESCAPE:
+            i += len(_ESCAPE)
+            if i >= len(pattern):
+                raise ValueError(u'Invalid pattern, incomplete escape sequence')
+            result.append(re.escape(pattern[i:i + 1]))
+            i += 1
+
+        # Bracket expression [a]
+        elif pattern[i:i+len(_BE_OPEN)] == _BE_OPEN:
+            be, be_len = _parse_bracket_expression(pattern, i)
+            translated_be = _py_pattern_from_bracket_expression(be)  # TODO: pass options
+            result.append(translated_be)
+            i += be_len
+
+        # Wildstar ** (matched before asterisk)
+        elif wild_star and pattern[i:i+len(_WILD_STAR)] == _WILD_STAR:
+            if i == 0:
+                head_wild_star = True
+            else:
+                if pattern[i - 1] != _SLASH:
+                    raise ValueError(u'Invalid pattern: wild star ** can only start pattern or '
+                                     u'follow a slash')
+            i += len(_WILD_STAR)
+            while True:  # Consume stars, example: foo/**/****/***/bar is equivalent to foo/**/bar
+                if i == len(pattern):
+                    tail_wild_star = True
+                    break
+                if pattern[i:i+len(_ASTERISK)] == _ASTERISK:
+                    i += len(_ASTERISK)
+                    continue
+                elif pattern[i:i+len(_SLASH)] == _SLASH:
+                    if pattern[i:i + len(_SLASH) + len(_WILD_STAR)] == _SLASH + _WILD_STAR:
+                        i += len(_ASTERISK) + len(_WILD_STAR)
+                        continue
+                    else:
+                        i += len(_SLASH)
+                        break
+                else:
+                    raise ValueError(u'Invalid pattern: wild star ** can only end pattern or '
+                                     u'be followed by a slash')
+
+            if tail_wild_star:  # Pattern like ** or foo/**:
+                result.append(u'.*')
+            else:  # Pattern like **/foo or foo/**/bar, the slash following ** is already consumed
+                result.append(u'(?:.*\\/)?')
+
+        # Asterisk *
+        elif pattern[i:i+len(_ASTERISK)] == _ASTERISK:
+            if path_name:
+                result.append(u'[^/]*')
+            else:
+                result.append(u'.*')
+            i += len(_ASTERISK)
+
+        # Question mark ?
+        elif pattern[i:i + len(_QUESTION_MARK)] == _QUESTION_MARK:
+            if path_name:
+                result.append(u'[^/]')
+            else:
+                result.append(u'.')
+            i += len(_QUESTION_MARK)
+
+        # Literal
+        else:
+            result.append(re.escape(pattern[i:i+1]))
+            i += 1
+
+        if i > len(pattern):
+            raise ValueError(u'InvalidPattern: parse error, index out of bounds')
+
+    pattern = u''.join(result)
+    pattern = u'\\A' + pattern + u'\\Z'
+    return re.compile(pattern)
+
+
+def _py_pattern_from_bracket_expression(bracket_expression):
+    u"""
+    This does not handle exclusion of separators in the bracket expression when pathname is True
+    :param bracket_expression:
+    :return:
+    """
+    single_chars = set()
+    multi_chars = set()
+    ranges = set()
+    matching, items = _read_bracket_expression(bracket_expression)
+    for item in items:
+        if _is_be_range(item):
+            start_seq, end_seq = _read_be_range(item)
+            if len(start_seq) != 1 or len(end_seq) != 1:
+                raise ValueError(u'Ranges are only supported between single-char collating elems')
+            ranges.add((start_seq, end_seq))
+        elif _is_be_character_class(item):
+            # TODO: handle character classes...
+            # Idea: (?:[single r-an-ge-!]|multi1|multi2|[class1]|[class2])
+            raise ValueError(u'Character classes are not supported')
+        else:
+            if _is_be_collating_element(item):
+                sequence = _read_be_collating_element(item)
+            elif _is_be_equivalence_class(item):
+                sequence = _read_be_equivalence_class(item)
+            else:
+                raise ValueError(u'Unexpected item {}'.format(item))
+
+            if len(sequence) == 0:
+                raise ValueError(u'Empty string is not a valid collating element')
+            elif len(sequence) == 1:
+                single_chars.add(sequence)
+            else:
+                multi_chars.add(sequence)
+
+    # TODO: remove slash when using pathname
+
+    if len(single_chars) > 0 or len(ranges) > 0:
+        primary_pattern = [u'['] if matching else [u'[^']
+
+        for char in single_chars:
+            primary_pattern.append(_escape_bracket_expression_character(char))
+
+        for start, end in ranges:
+            primary_pattern.append(_escape_bracket_expression_character(start))
+            primary_pattern.append(u'-')
+            primary_pattern.append(_escape_bracket_expression_character(end))
+
+        primary_pattern.append(u']')
+        primary_pattern = u''.join(primary_pattern)
+    else:
+        primary_pattern = None
+
+    if len(multi_chars) > 0:
+        if not matching:
+            raise ValueError(u'Cannot perform negative match on bracket expression containing '
+                             u'multi-character collating elements')
+        alternate_pattern = u'|'.join(re.escape(seq) for seq in multi_chars)
+    else:
+        alternate_pattern = None
+
+    if alternate_pattern is None:
+        if primary_pattern is None:  # Can happen when removing characters
+            return _PY_IMPOSSIBLE_MATCH
+        else:
+            return primary_pattern
+    else:
+        if primary_pattern is not None:
+            alternate_pattern = primary_pattern + u'|' + alternate_pattern
+        return u'(?:{})'.format(alternate_pattern)
+
+
+def _escape_bracket_expression_character(unsafe_char):
+    if unsafe_char == u'^':
+        return u'\\^'
+    elif unsafe_char == u']':
+        return u'\\]'
+    elif unsafe_char == u'-':
+        return u'\\-'
+    elif unsafe_char == u'\\':
+        return u'\\\\'
+    else:
+        return unsafe_char
 
 
 def match(pattern, text, no_escape=False, path_name=False, wild_star=False, period=False,
