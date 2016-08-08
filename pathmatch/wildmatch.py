@@ -69,16 +69,16 @@ _BE_RANGE = u'-'
 class _BracketExpression(object):
     u"""
 
-    list contains one of the following:
+    items contains one of the following:
     text_type: literal match, can be a multi-character string to represent some collating elements
     Tuple[text_type, text_type]: represents an inclusive range, the first item is the start
                                  collating element, the second is the end. Only single-character
                                  collating elements are supported.
 
     """
-    def __init__(self, matching, list):
+    def __init__(self, matching, items):
         self.matching = matching
-        self.list = list
+        self.items = items
 
 
 # Create a bracket expression item
@@ -99,8 +99,8 @@ def _create_be_range(start, end):
     return u'range', start, end
 
 
-def _create_be_empty_range():
-    return u'_empty_range'
+def _create_be_unmatched_range():
+    return (u'_unmatched_range',)
 
 
 # Test a bracket expression item
@@ -121,8 +121,8 @@ def _is_be_range(item):
     return item[0] == u'range'
 
 
-def _is_be_empty_range(item):
-    return item[0] == u'_empty_range'
+def _is_be_unmatched_range(item):
+    return item[0] == u'_unmatched_range'
 
 
 # Read a bracket expression item
@@ -167,7 +167,6 @@ def _parse_bracket_expression(pattern, start=0):
     else:
         matching = True
 
-
     # We iterate other the items twice, first we get the tokens and parse most of it except for
     # ranges. Then, we resolve ranges by joining collating elements separated by an empty range
     # marker
@@ -176,8 +175,12 @@ def _parse_bracket_expression(pattern, start=0):
     items = []
 
     # First pass: tokenize
-    while len(list) == 0 or pattern[i:i + len(_BE_CLOSE)] != _BE_CLOSE:
-        if pattern[i:i+len(_BE_CS_OPEN)] == _BE_CS_OPEN:  # Collating symbol [.abc.]
+    while len(items) == 0 or pattern[i:i + len(_BE_CLOSE)] != _BE_CLOSE:
+        if pattern[i:i+len(_ESCAPE)] == _ESCAPE:  # Literal escape \a
+            i += len(_ESCAPE)
+            items.append(_create_be_collating_element(pattern[i:i + 1]))
+            i += 1
+        elif pattern[i:i+len(_BE_CS_OPEN)] == _BE_CS_OPEN:  # Collating symbol [.abc.]
             cs, cs_len = _parse_be_collating_symbol(pattern, i)
             items.append(_create_be_collating_element(cs))
             i += cs_len
@@ -193,7 +196,7 @@ def _parse_bracket_expression(pattern, start=0):
             items.append(_create_be_character_class(cc_name))
             i += cce_len
         elif pattern[i:i + len(_BE_RANGE)] == _BE_RANGE:  # Range a-c
-            items.append(_create_be_empty_range())
+            items.append(_create_be_unmatched_range())
             i += len(_BE_RANGE)
         else:  # Single-character collating element
             items.append(_create_be_collating_element(pattern[i:i+1]))
@@ -204,34 +207,46 @@ def _parse_bracket_expression(pattern, start=0):
 
     # Second pass: resolve ranges
     items_with_ranges = []
-    for j in range(len(items)):
+    j = 0
+    while j < len(items):
         item = items[j]
-        if not _is_be_empty_range(item):
+        if not _is_be_unmatched_range(item):
             items_with_ranges.append(item)
-            continue
-        if j == 0 or j == len(items) - 1:
-            # _BE_RANGE at start or end of bracket expression: literal match
-            # The item creation uses implicitly len(_BE_RANGE) == 1
-            items_with_ranges.append(_create_be_collating_element(_BE_RANGE))
-            continue
-        # We now know that there are items before and after:
-        before = items_with_ranges[-1]
-        after = items[j + 1]
-        if _is_be_collating_element(before) and _is_be_collating_element(after):
-            start_seq = _read_be_collating_element(before)
-            end_seq = _read_be_collating_element(after)
-            # We currently allow ranges between multi-character collating elements
-            items_with_ranges.append(_create_be_range(start_seq, end_seq))
-        elif _is_be_range(before):  # Example: [a-b-c]
-            raise ValueError(u'InvalidPattern: forbidden chained ranges')
         else:
-            # TODO:
-            # [--a] means range from `-` to `a`
-            # [a--] means range from `a` to `-` (valid syntax, invalid semantic)
-            # [a--b] is invalid
-            # [[:alpha:]--a] is valid
-            # [b-c--a] is valid
-            pass
+            # From here, the current item is an unmatched range, we try to get the previous and next
+            # item if they are collating elements
+            if j == 0:
+                prev_elem = None
+            else:
+                prev_elem = items_with_ranges[-1]
+                if not _is_be_collating_element(prev_elem):
+                    prev_elem = None
+            if j == len(items) - 1:
+                next_elem = None
+            else:
+                next_elem = items[j + 1]
+                # case [a--], [---] or [[.a.]--]
+                if prev_elem is not None and _is_be_unmatched_range(next_elem):
+                    next_elem = _create_be_collating_element(_BE_RANGE)
+                elif not _is_be_collating_element(next_elem):
+                    next_elem = None
+
+            # Unmatched dash between two collating elements
+            if prev_elem is not None and next_elem is not None:
+                # Note that we allow ranges between multi-character collating elements
+                range_start = _read_be_collating_element(prev_elem)
+                range_end = _read_be_collating_element(next_elem)
+                # Equivalent to .pop then .append
+                items_with_ranges[-1] = _create_be_range(range_start, range_end)
+                j += 1  # Skip the next item (corresponds to the end of the range)
+            # Add the dash as a collating element
+            else:
+                items_with_ranges.append(_create_be_collating_element(_BE_RANGE))
+                _create_be_collating_element(_BE_RANGE)
+        j += 1
+
+    return matching, items_with_ranges
+
 
 
 def _parse_be_collating_symbol(pattern, start=0):
@@ -249,8 +264,7 @@ def _parse_be_collating_symbol(pattern, start=0):
     # collating symbols of the current locale.
 
     i = start
-
-    if pattern[i:i + len(_BE_CS_OPEN)] == _BE_CS_OPEN:
+    if pattern[i:i + len(_BE_CS_OPEN)] != _BE_CS_OPEN:
         raise ValueError(u'Expected {}'.format(repr(_BE_CS_OPEN)))
     i += len(_BE_CS_OPEN)
 
@@ -276,7 +290,7 @@ def _parse_be_equivalence_class_expression(pattern, start=0):
 
     i = start
 
-    if pattern[i:i + len(_BE_ECE_OPEN)] == _BE_ECE_OPEN:
+    if pattern[i:i + len(_BE_ECE_OPEN)] != _BE_ECE_OPEN:
         raise ValueError(u'Expected {}'.format(repr(_BE_ECE_OPEN)))
     i += len(_BE_ECE_OPEN)
 
@@ -298,7 +312,7 @@ def _parse_be_character_class_expression(pattern, start=0):
 
     i = start
 
-    if pattern[i:i + len(_BE_CCE_OPEN)] == _BE_CCE_OPEN:
+    if pattern[i:i + len(_BE_CCE_OPEN)] != _BE_CCE_OPEN:
         raise ValueError(u'Expected {}'.format(repr(_BE_CCE_OPEN)))
     i += len(_BE_CCE_OPEN)
 
