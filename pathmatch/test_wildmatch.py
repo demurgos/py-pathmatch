@@ -32,15 +32,15 @@ class TestWildmatchFunctions(unittest.TestCase):
 
     def match_wild_star(self, pattern, text, result):
         if result is None:  # Expect error
-            msg = u'Expect match({}, {}) to raise an error'.format(repr(pattern), repr(text))
-            print(msg)
+            # msg = u'Expect match({}, {}) to raise an error'.format(repr(pattern), repr(text))
+            # print(msg)
             with self.assertRaises(Exception):
                 wildmatch.translate(pattern, wild_star=True)
         else:
-            msg = u'Expect match({}, {}) to be {}'.format(repr(pattern), repr(text), repr(result))
-            print(msg)
+            # msg = u'Expect match({}, {}) to be {}'.format(repr(pattern), repr(text), repr(result))
+            # print(msg)
             regex = wildmatch.translate(pattern, wild_star=True)
-            print(repr(regex.pattern))
+            # print(repr(regex.pattern))
             self.assertEqual(result, regex.match(text) is not None, msg)
 
     def match(self, pattern, text, result):
