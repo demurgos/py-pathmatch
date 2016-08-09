@@ -28,7 +28,7 @@ setup(
     author=u'Charles Samborski',
     author_email=u'demurgos.net@gmail.com',
     url = 'https://github.com/demurgos/py-pathmatch',
-    download_url = 'https://github.com/demurgos/py-pathmatch/tarball/0.1.0',
+    download_url = 'https://github.com/demurgos/py-pathmatch/tarball/v0.1.0',
     # https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[
         u'Development Status :: 3 - Alpha',
