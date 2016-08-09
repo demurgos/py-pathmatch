@@ -648,11 +648,11 @@ class WildmatchPattern(object):
 
         self.pattern = pattern
         self.flags = {
-            no_escape: no_escape,
-            path_name: path_name,
-            wild_star: wild_star,
-            period: period,
-            case_fold: case_fold
+            u'no_escape': no_escape,
+            u'path_name': path_name,
+            u'wild_star': wild_star,
+            u'period': period,
+            u'case_fold': case_fold
         }
         self.regex = translate(pattern, closed_regex=True, **self.flags)
 
