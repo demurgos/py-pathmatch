@@ -39,8 +39,8 @@ Example
 Features
 --------
 
-wildmatch
-~~~~~~~~~
+wildmatch support
+~~~~~~~~~~~~~~~~~
 
 Currently, the following ``wildmatch`` features are supported:
 
@@ -65,8 +65,8 @@ Limitations:
 
 See ``test_wildmatch.py`` for more details.
 
-fnmatch
-~~~~~~~
+fnmatch support
+~~~~~~~~~~~~~~~
 
 The dedicated ``fnmatch`` module is not yet configured (this should just be a subset of wildmatch).
 
@@ -74,9 +74,9 @@ References:
 -----------
 
 - `fnmatch <http://pubs.opengroup.org/onlinepubs/9699919799/functions/fnmatch.html>`_, see  also `pattern matching <http://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_13>`_
-- `wildmatch <https://github.com/git/git/blob/master/wildmatch.c>`_ C implementation for ``git``
-- `wildmatch <https://github.com/davvid/wildmatch/blob/master/wildmatch/wildmatch.c>`_ C implementation (alternative)
-- `wildmatch <https://github.com/vmeurisse/wildmatch/blob/master/src/wildmatch.js>`_ Javascript implementation
+- `wildmatch C implementation for git <https://github.com/git/git/blob/master/wildmatch.c>`_
+- `wildmatch C implementation (alternative) <https://github.com/davvid/wildmatch/blob/master/wildmatch/wildmatch.c>`_
+- `wildmatch Javascript implementation <https://github.com/vmeurisse/wildmatch/blob/master/src/wildmatch.js>`_
 
 License
 -------
