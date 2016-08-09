@@ -26,16 +26,21 @@ setup(
     description=u'Path matching utilities',
     long_description=LONG_DESCRIPTION,
     author=u'Charles Samborski',
-    author_email=u'samborski.charles@gemalto.com',
+    author_email=u'demurgos.net@gmail.com',
+    url = 'https://github.com/demurgos/py-pathmatch',
+    download_url = 'https://github.com/demurgos/py-pathmatch/tarball/0.0.1',
     # https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[
-        u'Development Status :: 2 - Pre-Alpha',
+        u'Development Status :: 3 - Alpha',
         u'Intended Audience :: Developers',
+        u'License :: OSI Approved :: MIT License',
         u'Operating System :: OS Independent',
-        u'Programming Language :: Python :: 2.7'
+        u'Programming Language :: Python :: 2.7',
+        u'Programming Language :: Python :: 3.5',
+        u'Topic :: Utilities'
     ],
-    keywords=u'sample setuptools development',
-    packages=find_packages(exclude=[u'contrib', u'docs', u'tests']),
+    keywords=u'fnmatch wildmatch gitignore',
+    packages=find_packages(exclude=[u'contrib', u'docs', u'tests', u'tools']),
     install_requires=[
         u'six>=1.10.0',
         u'typing>=3.5.2',
