@@ -71,7 +71,7 @@ The dedicated `fnmatch` module is not yet configured (this should just be a subs
 
 ## License
 
-[MIT License, Copyright (c) 2016 Charles Samborski](./LICENSE.md)
+[MIT License, Copyright (c) 2016 Charles Samborski](./LICENSE.txt)
 
 
 [POSIX.1-2008]: http://pubs.opengroup.org/onlinepubs/9699919799/
