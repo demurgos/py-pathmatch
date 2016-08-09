@@ -1,8 +1,14 @@
 # -*- coding: utf8 -*-
 
 u"""
-This module exposes a minimal interface to manipulate files independently of the detail
-implementation (e.g. stored locally or accessed trough SSH).
+This module exposes file matching utilities using `wildmatch` patterns.
+
+Many comments in the source code reference "collating elements", these are an abstraction over
+characters and represent a "logical unit" for ordering. This is a locale dependent concept, most of
+the time one character corresponds to one collating element but there are some multi-character
+collating elements in some locales.
+https://en.wikipedia.org/wiki/Collation
+https://www.gnu.org/software/gnulib/manual/html_node/Collating-Elements-vs_002e-Characters.html
 """
 
 from __future__ import absolute_import
@@ -11,42 +17,37 @@ from __future__ import print_function
 from __future__ import unicode_literals
 from __future__ import with_statement
 
-
-from abc import ABCMeta, abstractmethod
-
 from six import text_type
 import typing
 
-from future.utils import with_metaclass
-import paramiko
-
 import re
-
-import fnmatch
 
 RegexType = type(re.compile(u''))
 
-# POSIX character classes
+# POSIX character classes for ASCII.
+# This is currently not used, ideally we would support unicode character classes
 # http://pubs.opengroup.org/onlinepubs/9699919799/functions/wctype.html
 # http://pubs.opengroup.org/onlinepubs/009695399/basedefs/xbd_chap09.html#tag_09_03_05
 _CHARACTER_CLASSES = {
-    u'alnum': re.compile(u'[a-zA-Z0-9]'),
-    u'alpha': re.compile(u'[a-zA-Z]'),
-    u'blank': re.compile(u'[ \\t]'),
-    u'cntrl': re.compile(u'[\\x00-\\x1f\\x7f]'),  # ASCII C0 (ECMA-48) characters and DEL (0x7f)
-    u'digit': re.compile(u'[0-9]'),
-    u'graph': re.compile(u'[\\x21-\\x7e]'),  # ASCII graphical characters (without C0, DEL and SP)
-    u'lower': re.compile(u'[a-z]'),
-    u'print': re.compile(u'[\\x20-\\x7e]'),  # ASCII printable characters (without C0 and DEL)
-    u'punct': re.compile(u'[!"#$%&\'()*+,\\-./:;<=>?@[\\\\\\]^_`{|}~]'),  # Escaped characters: -\]
-    u'space': re.compile(u'[ \\t\\r\\n\\v\\f]'),  # ASCII: SP, HT, CR, LF, VT, FF
-    u'upper': re.compile(u'[A-Z]'),
-    u'xdigit': re.compile(u'[A-Fa-f0-9]'),
+    u'alnum': u'[a-zA-Z0-9]',
+    u'alpha': u'[a-zA-Z]',
+    u'blank': u'[ \\t]',
+    u'cntrl': u'[\\x00-\\x1f\\x7f]',  # ASCII C0 (ECMA-48) characters and DEL (0x7f)
+    u'digit': u'[0-9]',
+    u'graph': u'[\\x21-\\x7e]',  # ASCII graphical characters (without C0, DEL and SP)
+    u'lower': u'[a-z]',
+    u'print': u'[\\x20-\\x7e]',  # ASCII printable characters (without C0 and DEL)
+    u'punct': u'[!"#$%&\'()*+,\\-./:;<=>?@[\\\\\\]^_`{|}~]',  # Escaped characters: -\]
+    u'space': u'[ \\t\\r\\n\\v\\f]',  # ASCII: SP, HT, CR, LF, VT, FF
+    u'upper': u'[A-Z]',
+    u'xdigit': u'[A-Fa-f0-9]',
 }
+
+# When inserted in a pattern, this prevents the pattern to match anything.
 _PY_IMPOSSIBLE_MATCH = u'(?:a\A)'
 
 # Wildmatch special characters
-_SLASH = u'/'  # Directories separator
+_SLASH = u'/'  # Path separator
 _PERIOD = u'.'
 _ASTERISK = u'*'
 _WILD_STAR = u'**'
@@ -152,7 +153,7 @@ def _read_be_range(item):
     return item[1], item[2]
 
 
-def _parse_bracket_expression(pattern, start=0):
+def _parse_bracket_expression(pattern, start=0, no_escape=False):
     u"""
 
     :type pattern: text_type
@@ -185,7 +186,7 @@ def _parse_bracket_expression(pattern, start=0):
 
     # First pass: tokenize
     while len(items) == 0 or pattern[i:i + len(_BE_CLOSE)] != _BE_CLOSE:
-        if pattern[i:i+len(_ESCAPE)] == _ESCAPE:  # Literal escape \a
+        if not no_escape and pattern[i:i+len(_ESCAPE)] == _ESCAPE:  # Literal escape \a
             i += len(_ESCAPE)
             if i >= len(pattern):
                 raise ValueError(u'Invalid pattern, incomplete escape sequence')
@@ -258,7 +259,6 @@ def _parse_bracket_expression(pattern, start=0):
         j += 1
 
     return _create_bracket_expression(matching, items_with_ranges), i - start
-
 
 
 def _parse_be_collating_symbol(pattern, start=0):
@@ -341,8 +341,8 @@ def _parse_be_character_class_expression(pattern, start=0):
     return pattern[ce_start:ce_end], i - start
 
 
-def translate(pattern, no_escape=False, path_name=False, wild_star=False, period=False,
-              case_fold=False):
+def translate(pattern, no_escape=False, path_name=True, wild_star=True, period=False,
+              case_fold=False, closed_regex=True):
     u"""
     Converts a wildmatch pattern to a regex
 
@@ -368,6 +368,9 @@ def translate(pattern, no_escape=False, path_name=False, wild_star=False, period
                    - path_name (or wild_star) is True and the previous character is a slash
     :type case_fold: bool
     :param case_fold: Perform a case insensitive match (GNU Extension)
+    :type closed_regex: bool
+    :param closed_regex: Includes anchors to match start and end of string. You might want to
+                         disable this flag if you want to compose regular expressions.
     :rtype: RegexType
     :return: A compiled regex object
     """
@@ -394,8 +397,8 @@ def translate(pattern, no_escape=False, path_name=False, wild_star=False, period
 
         # Bracket expression [a]
         elif pattern[i:i+len(_BE_OPEN)] == _BE_OPEN:
-            be, be_len = _parse_bracket_expression(pattern, i)
-            translated_be = _py_pattern_from_bracket_expression(be)  # TODO: pass options
+            be, be_len = _parse_bracket_expression(pattern, i, no_escape=no_escape)
+            translated_be = _py_pattern_from_bracket_expression(be)  # TODO: remove slash/period
             result.append(translated_be)
             i += be_len
 
@@ -456,7 +459,8 @@ def translate(pattern, no_escape=False, path_name=False, wild_star=False, period
             raise ValueError(u'InvalidPattern: parse error, index out of bounds')
 
     pattern = u''.join(result)
-    pattern = u'\\A' + pattern + u'\\Z'
+    if closed_regex:
+        pattern = u'\\A' + pattern + u'\\Z'
     return re.compile(pattern)
 
 
@@ -578,34 +582,110 @@ def match(pattern, text, no_escape=False, path_name=False, wild_star=False, peri
     :return: Result of the match
     """
 
-    pattern_length = len(pattern)
-    text_length = len(text)
-    pattern_pos = 0
-    text_pos = 0
+    regex = translate(pattern, no_escape=no_escape, path_name=path_name, wild_star=wild_star,
+                      period=period, case_fold=case_fold, closed_regex=True)
+    return regex.match(text) is not None
 
 
+def filter(pattern, texts, no_escape=False, path_name=False, wild_star=False, period=False,
+           case_fold=False):
+    u"""
+    A returns a generator yielding the elements of `texts` matching the pattern with the supplied
+    options.
 
-    return False
-
-
-def filter(pattern, texts, casefold=False, pathname=True):
-    return (text for text in texts if match(pattern, text, casefold, pathname))
-
+    :type pattern: text_type
+    :param pattern: A wildmatch pattern
+    :type texts: typing.Iterable[text_type]
+    :param texts: An iterable collection of texts to match
+    :type no_escape: bool
+    :param no_escape: Disable backslash escaping
+    :type path_name: bool
+    :param path_name: Separator (slash) in text cannot be matched by an asterisk, question-mark nor
+                      bracket expression in pattern (only a literal).
+    :type wild_star: bool
+    :param wild_star: A True value forces the `path_name` flag to True. This allows the
+                      double-asterisk `**` to match any (0 to many) number of directories
+    :type period: bool
+    :param period: A leading period in text cannot be matched by an asterisk, question-mark nor
+                   bracket expression in pattern (only a literal). A period is "leading" if:
+                   - it is the first character of `text`
+                   OR
+                   - path_name (or wild_star) is True and the previous character is a slash
+    :type case_fold: bool
+    :param case_fold: Perform a case insensitive match (GNU Extension)
+    :rtype: typing.Iterable[text_type]
+    :return: A generator of filtered elements.
+    """
+    regex = translate(pattern, no_escape=no_escape, path_name=path_name, wild_star=wild_star,
+                      period=period, case_fold=case_fold, closed_regex=True)
+    return (text for text in texts if regex.match(text) is not None)
 
 
 class WildmatchPattern(object):
-    def __init__(self, pattern):
+    def __init__(self, pattern, no_escape=False, path_name=False, wild_star=False, period=False,
+                 case_fold=False):
         u"""
         :type pattern: text_type
-        :param pattern: A valid pathmatch pattern
+        :param pattern: A wildmatch pattern
+        :type no_escape: bool
+        :param no_escape: Disable backslash escaping
+        :type path_name: bool
+        :param path_name: Separator (slash) in text cannot be matched by an asterisk, question-mark nor
+                          bracket expression in pattern (only a literal).
+        :type wild_star: bool
+        :param wild_star: A True value forces the `path_name` flag to True. This allows the
+                          double-asterisk `**` to match any (0 to many) number of directories
+        :type period: bool
+        :param period: A leading period in text cannot be matched by an asterisk, question-mark nor
+                       bracket expression in pattern (only a literal). A period is "leading" if:
+                       - it is the first character of `text`
+                       OR
+                       - path_name (or wild_star) is True and the previous character is a slash
+        :type case_fold: bool
+        :param case_fold: Perform a case insensitive match (GNU Extension)
+        :rtype: None
         """
-        self.pattern = pattern
 
-    def translate(self, text):
-        return translate(self.pattern)
+        self.pattern = pattern
+        self.flags = {
+            no_escape: no_escape,
+            path_name: path_name,
+            wild_star: wild_star,
+            period: period,
+            case_fold: case_fold
+        }
+        self.regex = translate(pattern, closed_regex=True, **self.flags)
+
+    def translate(self, closed_regex=True):
+        u"""
+        Returns a Python regular expression allowing to match
+        :return:
+        """
+        if closed_regex:
+            return self.regex
+        else:
+            return translate(self.pattern, closed_regex=False, **self.flags)
 
     def match(self, text):
-        return match(self.pattern, text)
+        u"""
+        Matches `text` against the current pattern.
+
+        :type text: text_type
+        :param text: A text to match against this pattern
+        :rtype: bool
+        :return: Result of the match
+        """
+        return self.regex.match(text) is not None
+
+    __call__ = match
 
     def filter(self, texts):
-        return filter(self.pattern, texts)
+        u"""
+        A returns a generator yielding the elements of `texts` matching this pattern.
+
+        :type texts: typing.Iterable[text_type]
+        :param texts: An iterable collection of texts to match
+        :rtype: typing.Iterable[text_type]
+        :return: A generator of filtered elements.
+        """
+        return (text for text in texts if self.regex.match(text) is not None)
