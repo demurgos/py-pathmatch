@@ -22,14 +22,14 @@ with codecs.open(os.path.join(PROJECT_ROOT, u'README.rst'), encoding=u'UTF-8') a
 
 setup(
     name=u'pathmatch',
-    version=u'0.1.3',
+    version=u'0.1.4',
     description=u'Path matching utilities',
     long_description=LONG_DESCRIPTION,
     author=u'Charles Samborski',
     author_email=u'demurgos.net@gmail.com',
     license=u'MIT License',
     url = 'https://github.com/demurgos/py-pathmatch',
-    download_url = 'https://github.com/demurgos/py-pathmatch/tarball/v0.1.3',
+    download_url = 'https://github.com/demurgos/py-pathmatch/tarball/v0.1.4',
     # https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[
         u'Development Status :: 3 - Alpha',
@@ -40,7 +40,7 @@ setup(
         u'Programming Language :: Python :: 3.5',
         u'Topic :: Utilities'
     ],
-    keywords=u'fnmatch wildmatch gitignore',
+    keywords=[u'fnmatch', u'wildmatch', u'gitignore'],
     packages=find_packages(exclude=[u'contrib', u'docs', u'tests', u'tools']),
     install_requires=[
         u'six>=1.10.0',
