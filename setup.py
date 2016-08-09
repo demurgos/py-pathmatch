@@ -22,13 +22,13 @@ with codecs.open(os.path.join(PROJECT_ROOT, u'README.md'), encoding=u'UTF-8') as
 
 setup(
     name=u'pathmatch',
-    version=u'0.0.1',
+    version=u'0.1.0',
     description=u'Path matching utilities',
     long_description=LONG_DESCRIPTION,
     author=u'Charles Samborski',
     author_email=u'demurgos.net@gmail.com',
     url = 'https://github.com/demurgos/py-pathmatch',
-    download_url = 'https://github.com/demurgos/py-pathmatch/tarball/0.0.1',
+    download_url = 'https://github.com/demurgos/py-pathmatch/tarball/0.1.0',
     # https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[
         u'Development Status :: 3 - Alpha',
