@@ -1,4 +1,3 @@
-=========
 Pathmatch
 =========
 
@@ -81,4 +80,4 @@ References:
 License
 -------
 
-`MIT License, Copyright (c) 2016 Charles Samborski <./LICENSE.txt>`_
+MIT License, Copyright (c) 2016 Charles Samborski

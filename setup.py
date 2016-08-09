@@ -18,7 +18,7 @@ PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
 
 # Get the long description from the README file
 with codecs.open(os.path.join(PROJECT_ROOT, u'README.rst'), encoding=u'UTF-8') as f:
-    LONG_DESCRIPTION = f.read()
+    LONG_DESCRIPTION = f.read().replace('\r\n', '\n').replace('\r', '\n')
 
 setup(
     name=u'pathmatch',
@@ -27,6 +27,7 @@ setup(
     long_description=LONG_DESCRIPTION,
     author=u'Charles Samborski',
     author_email=u'demurgos.net@gmail.com',
+    license=u'MIT License',
     url = 'https://github.com/demurgos/py-pathmatch',
     download_url = 'https://github.com/demurgos/py-pathmatch/tarball/v0.1.2',
     # https://pypi.python.org/pypi?%3Aaction=list_classifiers
