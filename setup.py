@@ -17,7 +17,7 @@ from setuptools import setup, find_packages
 PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
 
 # Get the long description from the README file
-with codecs.open(os.path.join(PROJECT_ROOT, u'README.md'), encoding=u'UTF-8') as f:
+with codecs.open(os.path.join(PROJECT_ROOT, u'README.rst'), encoding=u'UTF-8') as f:
     LONG_DESCRIPTION = f.read()
 
 setup(
