@@ -549,7 +549,7 @@ def _escape_bracket_expression_character(unsafe_char):
         return unsafe_char
 
 
-def match(pattern, text, no_escape=False, path_name=False, wild_star=False, period=False,
+def match(pattern, text, no_escape=False, path_name=True, wild_star=True, period=False,
           case_fold=False):
     u"""
     Matches text against the supplied wildmatch pattern.
@@ -622,7 +622,7 @@ def filter(pattern, texts, no_escape=False, path_name=False, wild_star=False, pe
 
 
 class WildmatchPattern(object):
-    def __init__(self, pattern, no_escape=False, path_name=False, wild_star=False, period=False,
+    def __init__(self, pattern, no_escape=False, path_name=True, wild_star=True, period=False,
                  case_fold=False):
         u"""
         :type pattern: text_type

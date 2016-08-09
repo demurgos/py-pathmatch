@@ -41,11 +41,11 @@ class TestWildmatchFunctions(unittest.TestCase):
             # print(msg)
             regex = wildmatch.translate(pattern, wild_star=True)
             # print(repr(regex.pattern))
-            self.assertEqual(result, regex.match(text) is not None, msg)
+            self.assertEqual(result, regex.match(text) is not None)
 
     def match(self, pattern, text, result):
         msg = u'Expect match({}, {}) to be {}'.format(repr(pattern), repr(text), repr(result))
-        self.assertEqual(result, wildmatch.match(pattern, text), msg)
+        self.assertEqual(result, wildmatch.match(pattern, text, wild_star=False, path_name=False), msg)
 
     def match_case_fold(self, pattern, text, result):
         msg = u'Expect match({}, {}) to be {}'.format(repr(pattern), repr(text), repr(result))
