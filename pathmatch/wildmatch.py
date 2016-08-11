@@ -17,7 +17,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 from __future__ import with_statement
 
-from six import text_type
+from six import text_type, unichr
 import typing
 
 import re
@@ -398,7 +398,7 @@ def translate(pattern, no_escape=False, path_name=True, wild_star=True, period=F
         # Bracket expression [a]
         elif pattern[i:i+len(_BE_OPEN)] == _BE_OPEN:
             be, be_len = _parse_bracket_expression(pattern, i, no_escape=no_escape)
-            translated_be = _py_pattern_from_bracket_expression(be)  # TODO: remove slash/period
+            translated_be = _py_pattern_from_bracket_expression(be, path_name=path_name)
             result.append(translated_be)
             i += be_len
 
@@ -464,7 +464,7 @@ def translate(pattern, no_escape=False, path_name=True, wild_star=True, period=F
     return re.compile(pattern)
 
 
-def _py_pattern_from_bracket_expression(bracket_expression):
+def _py_pattern_from_bracket_expression(bracket_expression, path_name):
     u"""
     This does not handle exclusion of separators in the bracket expression when pathname is True
     :param bracket_expression:
@@ -499,7 +499,43 @@ def _py_pattern_from_bracket_expression(bracket_expression):
             else:
                 multi_chars.add(sequence)
 
-    # TODO: remove slash when using pathname
+    if path_name:  # bracket expression cannot match /
+        if not matching:
+            single_chars.add(_SLASH)  # Pretty easy!
+        else:  # Remove slash from single_chars and ranges (we do not check multi_chars)
+            if _SLASH in single_chars:
+                single_chars.remove(_SLASH)
+
+            slash_code_point = ord(_SLASH)
+            cleared_ranges = set()
+            for range in ranges:
+                start_seq, end_seq = range
+                if len(start_seq) != 1 or len(end_seq) != 1:
+                    raise ValueError(u'Only ranges between single characters are supported in '
+                                     u'bracket expression with the path_name flag')
+                start_code_point = ord(start_seq)
+                end_code_point = ord(end_seq)
+                if start_code_point > end_code_point:
+                    raise ValueError(u'Invalid range, wrong order of bounds: {}'.format(range))
+                if slash_code_point < start_code_point or slash_code_point > end_code_point:
+                    cleared_ranges.add(range)
+                else:
+                    if start_seq == slash_code_point:
+                        if end_code_point == slash_code_point:  # /-/
+                            continue
+                        else:  # start = slash < end
+                            start_seq = unichr(start_code_point + 1)
+                            cleared_ranges.add((start_seq, end_seq))
+                    else:
+                        if end_code_point == slash_code_point:  # start < slash = end
+                            end_seq = unichr(end_code_point - 1)
+                            cleared_ranges.add((start_seq, end_seq))
+                        else:  # start < slash < end
+                            before_slash = unichr(slash_code_point - 1)
+                            after_slash = unichr(slash_code_point + 1)
+                            cleared_ranges.add((start_seq, before_slash))
+                            cleared_ranges.add((after_slash, end_seq))
+            ranges = cleared_ranges
 
     if len(single_chars) > 0 or len(ranges) > 0:
         primary_pattern = [u'['] if matching else [u'[^']
@@ -630,8 +666,8 @@ class WildmatchPattern(object):
         :type no_escape: bool
         :param no_escape: Disable backslash escaping
         :type path_name: bool
-        :param path_name: Separator (slash) in text cannot be matched by an asterisk, question-mark nor
-                          bracket expression in pattern (only a literal).
+        :param path_name: Separator (slash) in text cannot be matched by an asterisk, question-mark
+                          nor bracket expression in pattern (only a literal).
         :type wild_star: bool
         :param wild_star: A True value forces the `path_name` flag to True. This allows the
                           double-asterisk `**` to match any (0 to many) number of directories

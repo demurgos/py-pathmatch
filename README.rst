@@ -47,10 +47,16 @@ Currently, the following ``wildmatch`` features are supported:
 - Literal matching
 - Question mark ``?`` (any character) and asterisk ``*`` (any string) operators
 - Bracket expressions ``[abc]`` (character alternatives)
-  - Negation (supports both ``^`` and ``!`` meta-characters)
-  - Range expressions ``a-z``
-  - Collation Symbol ``[.ch.]``
-  - Equivalence classes syntax ``[=e=]``, but fallback to collation symbol semantics
+
+Bracket expression features:
+
+- Negation (supports both ``^`` and ``!`` meta-characters)
+- Range expressions ``a-z``
+- Collation Symbol ``[.ch.]``
+- Equivalence classes syntax ``[=e=]``, but fallback to collation symbol semantics
+- Supports the ``path_name`` flag to exclude ``/`` (which requires a literal match)
+
+See ``test_wildmatch.py`` for more details.
 
 Limitations:
 
@@ -58,11 +64,8 @@ Limitations:
 - ``period`` (require literal match for leading period) option is not supported
 - Negated bracket expression with multi-character collating elements are not supported
 - Character classes ``[:alpha:]`` for bracket expressions are not supported
-- Exclusion of ``/`` from bracket expressions (including negated ones) is not performed.
 
 **Contributions are welcomed**
-
-See ``test_wildmatch.py`` for more details.
 
 fnmatch support
 ~~~~~~~~~~~~~~~
