@@ -12,8 +12,34 @@ from __future__ import unicode_literals
 import unittest
 
 import pathmatch.wildmatch as wildmatch
+from pathmatch.helpers import generate_tests
 
 
+# TODO: convert all tests to parametrized generated tests
+@generate_tests(
+    match_wild_star=[
+        # Basic wildmatch features
+
+        # Literal match
+        (u'foo', u'foo', True),
+        (u'foo', u'bar', False),
+        (u'', u'', True),
+
+        # Quantifiers
+        (u'???', u'foo', True),
+        (u'??', u'foo', False),
+        (u'*', u'foo', True),
+        (u'f*', u'foo', True),
+        (u'*f', u'foo', False),
+        (u'*foo*', u'foo', True),
+        (u'*ob*a*r*', u'foobar', True),
+        (u'*ab', u'aaaaaaabababab', True),
+
+        (u'foo', u'foo', True),
+        (u'foo', u'bar', False),
+        (u'', u'', True),
+    ]
+)
 class TestWildmatchFunctions(unittest.TestCase):
     u"""
     TestCase for the TestWildmatch class
@@ -333,7 +359,6 @@ class TestWildmatchFunctions(unittest.TestCase):
         self.match_wild_star(u'deep/**', u'deep/foo/bar/baz/x', True)
         self.match_wild_star(u'deep/**', u'deep/foo/bar/baz/x', True)
         self.match_wild_star(u'deep/**/***/****/*****', u'deep/foo/bar/baz/x', True)
-
 
     # def test_translate(self):
     #     # Basic wildmatch features

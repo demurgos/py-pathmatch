@@ -17,12 +17,17 @@ from __future__ import print_function
 from __future__ import unicode_literals
 from __future__ import with_statement
 
-from six import text_type, unichr
+import re
+# noinspection PyCompatibility
 import typing
 
-import re
+from six import text_type, unichr
+
+from pathmatch.pattern import Pattern
+
 
 RegexType = type(re.compile(u''))
+
 
 # POSIX character classes for ASCII.
 # This is currently not used, ideally we would support unicode character classes
@@ -88,6 +93,7 @@ class _BracketExpression(object):
 def _create_bracket_expression(matching, items):
     return u'bracket_expression', matching, items
 
+
 def _create_be_collating_element(sequence):
     return u'collating_element', sequence
 
@@ -105,13 +111,14 @@ def _create_be_range(start, end):
 
 
 def _create_be_unmatched_range():
-    return (u'_unmatched_range',)
+    return u'_unmatched_range',
 
 
 # Test a node
 
 def _is_bracket_expression(node):
-    return node[0] ==  u'bracket_expression'
+    return node[0] == u'bracket_expression'
+
 
 def _is_be_collating_element(item):
     return item[0] == u'collating_element'
@@ -136,6 +143,7 @@ def _is_be_unmatched_range(item):
 # Read a node
 def _read_bracket_expression(node):
     return node[1], node[2]
+
 
 def _read_be_collating_element(item):
     return item[1]
@@ -350,8 +358,6 @@ def translate(pattern, no_escape=False, path_name=True, wild_star=True, period=F
 
     :type pattern: text_type
     :param pattern: A wildmatch pattern
-    :type text: text_type
-    :param text: The text to match
     :type no_escape: bool
     :param no_escape: Disable backslash escaping
     :type path_name: bool
@@ -379,11 +385,17 @@ def translate(pattern, no_escape=False, path_name=True, wild_star=True, period=F
     if wild_star:
         path_name = True
 
+    if case_fold:
+        raise NotImplementedError(u'case_fold is not supported by wildmatch.translate')
+
+    if period:
+        raise NotImplementedError(u'period is not supported by wildmatch.translate')
+
     result = []
 
     i = 0
 
-    head_wild_star = False  # Wildstar at the start of the string
+    # head_wild_star = False  # Wildstar at the start of the string
     tail_wild_star = False  # Wildstar at the end of the string
 
     while i < len(pattern):
@@ -405,7 +417,9 @@ def translate(pattern, no_escape=False, path_name=True, wild_star=True, period=F
         # Wildstar ** (matched before asterisk)
         elif wild_star and pattern[i:i+len(_WILD_STAR)] == _WILD_STAR:
             if i == 0:
-                head_wild_star = True
+                # Uncomment the following line to detect wild stars at start of pattern
+                # head_wild_star = True
+                pass
             else:
                 if pattern[i - 1] != _SLASH:
                     raise ValueError(u'Invalid pattern: wild star ** can only start pattern or '
@@ -508,17 +522,17 @@ def _py_pattern_from_bracket_expression(bracket_expression, path_name):
 
             slash_code_point = ord(_SLASH)
             cleared_ranges = set()
-            for range in ranges:
-                start_seq, end_seq = range
+            for be_range in ranges:
+                start_seq, end_seq = be_range
                 if len(start_seq) != 1 or len(end_seq) != 1:
                     raise ValueError(u'Only ranges between single characters are supported in '
                                      u'bracket expression with the path_name flag')
                 start_code_point = ord(start_seq)
                 end_code_point = ord(end_seq)
                 if start_code_point > end_code_point:
-                    raise ValueError(u'Invalid range, wrong order of bounds: {}'.format(range))
+                    raise ValueError(u'Invalid range, wrong order of bounds: {}'.format(be_range))
                 if slash_code_point < start_code_point or slash_code_point > end_code_point:
-                    cleared_ranges.add(range)
+                    cleared_ranges.add(be_range)
                 else:
                     if start_seq == slash_code_point:
                         if end_code_point == slash_code_point:  # /-/
@@ -623,6 +637,7 @@ def match(pattern, text, no_escape=False, path_name=True, wild_star=True, period
     return regex.match(text) is not None
 
 
+# noinspection PyShadowingBuiltins
 def filter(pattern, texts, no_escape=False, path_name=False, wild_star=False, period=False,
            case_fold=False):
     u"""
@@ -657,7 +672,7 @@ def filter(pattern, texts, no_escape=False, path_name=False, wild_star=False, pe
     return (text for text in texts if regex.match(text) is not None)
 
 
-class WildmatchPattern(object):
+class WildmatchPattern(Pattern):
     def __init__(self, pattern, no_escape=False, path_name=True, wild_star=True, period=False,
                  case_fold=False):
         u"""
@@ -717,7 +732,7 @@ class WildmatchPattern(object):
 
     def filter(self, texts):
         u"""
-        A returns a generator yielding the elements of `texts` matching this pattern.
+        Returns a generator yielding the elements of `texts` matching this pattern.
 
         :type texts: typing.Iterable[text_type]
         :param texts: An iterable collection of texts to match

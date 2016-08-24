@@ -72,6 +72,19 @@ fnmatch support
 
 The dedicated ``fnmatch`` module is not yet configured (this should just be a subset of wildmatch).
 
+Contributing
+------------
+
+Tests
+~~~~~
+
+You can execute the tests with the following command:
+
+.. code:: shell
+
+    python -m unittest discover -s . -p test*.py
+
+
 References:
 -----------
 
