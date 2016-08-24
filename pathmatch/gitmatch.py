@@ -31,22 +31,20 @@ def normalize_path(path, base_path=u'/', is_dir=None):
     u"""
     Normalize a path to use it with a gitmatch pattern.
     This ensures that the separators are forward slashes.
-    If a path is rooted (starts with a slash), it has to be a subdirectory of `project_root`. The
-    path root is then changed to be based of `project_root`.
+    If a path is rooted (starts with a slash), it has to be a subdirectory of `base_path`. The
+    path root is then changed to be based of `base_path`.
 
     :type path: text_type
-    :param path:
+    :param path: A POSIX path to normalize
     :type base_path: text_type
-    :param base_path:
+    :param base_path: A POSIX path to the base directory, `path` must be inside `base_path`.
     :type is_dir: text_type
     :param is_dir: If `true`, adds a trailing slash. If `false` removes any trailing slash. If
                    `None`, keeps the current ending.
     :return:
     """
-    path = path.replace(u'\\', u'/')
     path = posixpath.normpath(path)
 
-    base_path = base_path.replace(u'\\', u'/')
     base_path = posixpath.normpath(base_path)
 
     if len(base_path) == 0:
@@ -57,6 +55,9 @@ def normalize_path(path, base_path=u'/', is_dir=None):
 
     if path.startswith(base_path):
         path = u'/' + posixpath.relpath(path, base_path)
+    elif path.startswith(u'/'):
+        raise ValueError(u'`path` ({}) is absolute but not inside base_path ({})'.format(path,
+                                                                                         base_path))
 
     if is_dir is None:
         return path

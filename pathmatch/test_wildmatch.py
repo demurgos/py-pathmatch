@@ -42,7 +42,7 @@ from pathmatch.helpers import generate_tests
 )
 class TestWildmatchFunctions(unittest.TestCase):
     u"""
-    TestCase for the TestWildmatch class
+    TestCase for the wildmatch functions
     """
 
     def parse_bracket_expression(self, pattern, expected_matching, expected_items=()):

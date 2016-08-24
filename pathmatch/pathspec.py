@@ -36,7 +36,23 @@ class Pathspec(object):
         self.negated = negated
 
     def match(self, text):
-        return self.pattern.match(text)
+        u"""
+        Alias for `self.pattern.match(text).
+        :param text:
+        :return:
+        """
+        return self.pattern.match(text) != self.negated
+
+    def filter(self, texts):
+        u"""
+        Filter a collection of elements.
+
+        :type texts: typing.Iterable[text_type]
+        :param texts: An iterable collection of texts to match
+        :rtype: typing.Generator[text_type]
+        :return: A generator of matched elements
+        """
+        return (text for text in texts if self.match(text))
 
 
 class PathspecList(object):
@@ -54,8 +70,19 @@ class PathspecList(object):
         :param path: The path to match against this list of path specs.
         :return:
         """
-        for spec in reversed(self.pathspecs):
-            if spec.match(path):
+        for spec in reversed(self.pathspecs):  # type: Pathspec
+            if spec.pattern.match(path):
                 return not spec.negated
 
         return False
+
+    def filter(self, texts):
+        u"""
+        Filter a collection of elements.
+
+        :type texts: typing.Iterable[text_type]
+        :param texts: An iterable collection of texts to match
+        :rtype: typing.Generator[text_type]
+        :return: A generator of matched elements
+        """
+        return (text for text in texts if self.match(text))
