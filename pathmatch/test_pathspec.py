@@ -77,7 +77,7 @@ class TestPathspecList(unittest.TestCase):
             # Included all the txt files
             Pathspec(GitmatchPattern(u'*.txt')),
             # Then exclude all the build files
-            Pathspec(GitmatchPattern(u'build/**'), negated=True),
+            Pathspec(GitmatchPattern(u'build'), negated=True),
         ])
         actual = set(psl.filter(files))
         expected = {

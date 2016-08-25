@@ -120,8 +120,19 @@ class GitmatchPattern(Pattern):
         :rtype: None
         """
         self.pattern = pattern
-        self._pattern = pattern if pattern[:1] == u'/' else u'**/' + pattern  # Normalized pattern
-        self.regex = wildmatch.translate(self._pattern, closed_regex=True)
+
+        # Non-rooted pattern performs a deep match
+        if pattern[:1] != u'/':
+            pattern = u'**/' + pattern
+
+        # Trailing slash semantics
+        if pattern[-1:] == u'/':
+            regex = wildmatch.translate(pattern + u'**', closed_regex=True)
+        else:
+            regex = wildmatch.translate(pattern, closed_regex=False)
+            regex = re.compile(u'\\A' + regex.pattern + u'(?:\\/.*)?\\Z', regex.flags)
+
+        self.regex = regex
 
     def translate(self):
         u"""
@@ -129,7 +140,7 @@ class GitmatchPattern(Pattern):
 
         :rtype: RegexType
         """
-        return self.regex  # TODO: Handle the trailing slash semantic
+        return self.regex
 
     def match(self, text):
         u"""
@@ -140,12 +151,6 @@ class GitmatchPattern(Pattern):
         :rtype: bool
         :return: Result of the match
         """
-        # TODO: Handle the trailing slash semantic with the regex
-        if self.regex.match(text) is not None:
-            return True
-        elif len(text) > 2 and text[-1] == u'/':
-            return self.regex.match(text[:-1]) is not None
-        else:
-            return False
+        return self.regex.match(text) is not None
 
     __call__ = match

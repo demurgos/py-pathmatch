@@ -30,6 +30,12 @@ from pathmatch.helpers import generate_tests
     ],
     match=[
         (u'build', u'build', True),
+        (u'build', u'build/', True),
+        (u'build', u'build/README.md', True),
+        (u'build/', u'build', False),
+        (u'build/', u'build/', True),
+        (u'build/', u'build/README.md', True),
+        (u'build/**', u'build', False),
         (u'build/**', u'build/', True),
         (u'build/**', u'build/README.md', True),
     ]
@@ -48,8 +54,10 @@ class TestWildmatchFunctions(unittest.TestCase):
             self.assertEqual(expected, actual)
 
     def match(self, pattern, path, expected):
-        actual = gitmatch.match(pattern, path)
-        self.assertEqual(expected, actual)
+        if expected:
+            self.assertTrue(gitmatch.match(pattern, path))
+        else:
+            self.assertFalse(gitmatch.match(pattern, path))
 
 
 if __name__ == u'__main__':
