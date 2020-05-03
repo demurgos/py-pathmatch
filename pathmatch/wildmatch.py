@@ -48,8 +48,8 @@ _CHARACTER_CLASSES = {
     u'xdigit': u'[A-Fa-f0-9]',
 }
 
-# When inserted in a pattern, this prevents the pattern to match anything.
-_PY_IMPOSSIBLE_MATCH = u'(?:a\A)'
+# When inserted in a pattern, this prevents the pattern from matching anything.
+_PY_IMPOSSIBLE_MATCH = u'(?:a\\A)'
 
 # Wildmatch special characters
 _SLASH = u'/'  # Path separator
