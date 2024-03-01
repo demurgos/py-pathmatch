@@ -44,7 +44,6 @@ setup(
     packages=find_packages(exclude=[u'contrib', u'docs', u'tests', u'tools']),
     install_requires=[
         u'six>=1.10.0',
-        u'typing>=3.5.2',
     ],
     extras_require={
         u'dev': [u'pylint>=1.5.6'],
